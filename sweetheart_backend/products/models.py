@@ -1,13 +1,12 @@
-# models.py
 from django.db import models
 
-# models.py
 class Product(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField()
-    price = models.IntegerField()  # Cambiado de DecimalField a IntegerField
-    stock = models.PositiveIntegerField(null=True)
-    servings = models.PositiveIntegerField(null=True, blank=True)
+    price = models.IntegerField()  # Cambiado a IntegerField según tu preferencia anterior
+    stock = models.PositiveIntegerField()  # Cantidad disponible en inventario
+    servings = models.PositiveIntegerField()  # Número de porciones
+    image_url = models.URLField(max_length=500)  # URL de la imagen del producto
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -17,6 +16,7 @@ class Product(models.Model):
 
 class Order(models.Model):
     name = models.CharField(max_length=100)
+    email = models.EmailField()  # Campo para el correo electrónico
     address = models.TextField()
     phone = models.CharField(max_length=15)
     products = models.ManyToManyField(Product)
