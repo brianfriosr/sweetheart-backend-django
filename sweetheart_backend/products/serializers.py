@@ -7,34 +7,56 @@ class ProductSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class OrderSerializer(serializers.ModelSerializer):
-    # Relación ManyToMany
-    products = ProductSerializer(many=True, read_only=True)  # Para mostrar los productos relacionados
+    products = ProductSerializer(many=True, read_only=True)
     product_ids = serializers.PrimaryKeyRelatedField(
         many=True,
         write_only=True,
         queryset=Product.objects.all()
-    )  # Para recibir los IDs de productos al crear un pedido
+    )
+    updated_product = serializers.DictField(write_only=True, required=False)
 
     class Meta:
         model = Order
-        fields = ['id', 'name', 'address', 'phone', 'products', 'product_ids', 'total_price', 'created_at']
+        fields = '__all__'
 
-def create(self, validated_data):
-    # Extraemos los IDs de los productos del diccionario de datos validados
-    # `pop` elimina la clave 'product_ids' del diccionario y la guarda en `product_ids`
-    # Si no encuentra 'product_ids', devuelve una lista vacía por defecto.
-    product_ids = validated_data.pop('product_ids', [])
-    
-    # Usamos el operador ** para desempaquetar los datos validados y pasarlos como argumentos
-    # clave-valor al método `Order.objects.create()`. Esto crea un nuevo objeto `Order`
-    # utilizando los datos del diccionario `validated_data`, excluyendo 'product_ids'
-    order = Order.objects.create(**validated_data)
+    def create(self, validated_data):
+        # Lógica existente para crear una orden
+        product_ids = validated_data.pop('product_ids', [])
+        updated_product = validated_data.pop('updated_product', {})
+        product_ids = [p.id if isinstance(p, Product) else p for p in product_ids]
+        order = Order.objects.create(**validated_data)
+        order.products.set(product_ids)
 
-    # Asignamos los productos al pedido usando la relación ManyToMany.
-    # `product_ids` es una lista de los IDs de productos seleccionados,
-    # y `order.products.set(product_ids)` asocia esos productos con el pedido recién creado.
-    order.products.set(product_ids)
+        if updated_product and product_ids:
+            product_id = product_ids[0]
+            try:
+                product = Product.objects.get(id=product_id)
+                product.servings = updated_product.get('servings', product.servings)
+                product.price = updated_product.get('price', product.price)
+                product.save()
+            except Product.DoesNotExist:
+                print(f"El producto con ID {product_id} no existe.")
+        return order
 
-    # Devolvemos el objeto `order` recién creado
-    return order
+    def update(self, instance, validated_data):
+        # Logs para depuración
+        print("Datos validados para la actualización:", validated_data)
 
+        # Actualizar campos de la orden
+        instance.name = validated_data.get('name', instance.name)
+        instance.email = validated_data.get('email', instance.email)
+        instance.address = validated_data.get('address', instance.address)
+        instance.phone = validated_data.get('phone', instance.phone)
+        instance.total_price = validated_data.get('total_price', instance.total_price)
+
+        # Si se proporcionaron nuevos productos, actualizarlos
+        product_ids = validated_data.pop('product_ids', None)
+        if product_ids:
+            product_ids = [p.id if isinstance(p, Product) else p for p in product_ids]
+            instance.products.set(product_ids)
+            print("Productos actualizados en la orden:", instance.products.all())
+
+        # Guardar cambios en la orden
+        instance.save()
+
+        return instance
